@@ -1,29 +1,34 @@
 import os
 import shutil
+import logging
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import UPLOAD_DIR
+from app.config import UPLOAD_DIR, CORS_ORIGINS, ENVIRONMENT
 from app.models import ChatRequest
 from app.agent import run_agent, stream_agent
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Smart Sales Agent", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+@app.get("/health")
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "environment": ENVIRONMENT}
 
 
 @app.post("/api/chat")

@@ -18,12 +18,6 @@ EXECUTE_PYTHON_TOOL = {
     }
 }
 
-ALLOWED_MODULES = {
-    "pandas", "json", "math", "datetime", "collections",
-    "statistics", "csv", "re", "itertools", "functools",
-    "decimal", "fractions", "operator", "string",
-}
-
 
 def execute_python(code: str) -> str:
     stdout_capture = io.StringIO()
