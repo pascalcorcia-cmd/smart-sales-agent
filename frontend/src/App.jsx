@@ -8,10 +8,14 @@ import AccountPlan from './components/AccountPlan'
 const TABS = [
   { id: 'chat', label: 'Chat IA', icon: '💬' },
   { id: 'account-plan', label: 'Account Plan', icon: '📊' },
+  { id: 'prep-rdv', label: 'Préparation RDV', icon: '📋' },
+  { id: 'qualify', label: 'Qualification Leads', icon: '🎯' },
+  { id: 'manage-meetings', label: 'Gestion Réunions', icon: '🗓️' },
+  { id: 'prospecting-email', label: 'Rédiger des emails', icon: '✉️' },
 ]
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('chat')
+  const [activeTab, setActiveTab] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -122,37 +126,45 @@ export default function App() {
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={styles.headerLeft}>
-          <h1 style={styles.title}>Smart Sales Agent</h1>
-          <nav style={styles.nav}>
+      {activeTab && (
+        <header style={styles.header}>
+          <div style={styles.headerLeft}>
+            <button onClick={() => setActiveTab(null)} style={styles.backBtn} title="Retour au menu">
+              ← Menu
+            </button>
+            <h1 style={styles.title}>Smart Sales Agent</h1>
+          </div>
+          {activeTab === 'chat' && (
+            <div style={styles.headerRight}>
+              <button onClick={() => setShowUpload(!showUpload)} style={styles.iconBtn} title="Upload fichier">
+                📎
+              </button>
+              <button onClick={handleNewChat} style={styles.iconBtn} title="Nouvelle conversation">
+                ✨
+              </button>
+            </div>
+          )}
+        </header>
+      )}
+
+      {!activeTab && (
+        <div style={styles.menuContainer}>
+          <h1 style={styles.menuTitle}>Smart Sales Agent</h1>
+          <p style={styles.menuSubtitle}>Choisissez une fonction</p>
+          <div style={styles.menuGrid}>
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  ...styles.navBtn,
-                  background: activeTab === tab.id ? '#6366f1' : 'transparent',
-                  color: activeTab === tab.id ? '#fff' : '#94a3b8',
-                }}
+                style={styles.menuBtn}
               >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
+                <div style={styles.menuBtnIcon}>{tab.icon}</div>
+                <div style={styles.menuBtnLabel}>{tab.label}</div>
               </button>
             ))}
-          </nav>
-        </div>
-        {activeTab === 'chat' && (
-          <div style={styles.headerRight}>
-            <button onClick={() => setShowUpload(!showUpload)} style={styles.iconBtn} title="Upload fichier">
-              📎
-            </button>
-            <button onClick={handleNewChat} style={styles.iconBtn} title="Nouvelle conversation">
-              ✨
-            </button>
           </div>
-        )}
-      </header>
+        </div>
+      )}
 
       {activeTab === 'chat' && (
         <>
@@ -212,6 +224,19 @@ export default function App() {
       )}
 
       {activeTab === 'account-plan' && <AccountPlan />}
+      {activeTab === 'prep-rdv' && <TabPlaceholder label="Préparation RDV" />}
+      {activeTab === 'qualify' && <TabPlaceholder label="Qualification Leads" />}
+      {activeTab === 'manage-meetings' && <TabPlaceholder label="Gestion Réunions" />}
+      {activeTab === 'prospecting-email' && <TabPlaceholder label="Rédiger des emails de prospection" />}
+    </div>
+  )
+}
+
+function TabPlaceholder({ label }) {
+  return (
+    <div style={styles.placeholder}>
+      <h2>{label}</h2>
+      <p>Fonctionnalité en développement...</p>
     </div>
   )
 }
@@ -225,6 +250,54 @@ const styles = {
     margin: '0 auto',
     width: '100%',
   },
+  menuContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '40px 20px',
+  },
+  menuTitle: {
+    fontSize: 36,
+    fontWeight: 700,
+    marginBottom: 12,
+    color: '#f1f5f9',
+  },
+  menuSubtitle: {
+    fontSize: 18,
+    color: '#94a3b8',
+    marginBottom: 40,
+  },
+  menuGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: 16,
+    maxWidth: 800,
+    width: '100%',
+  },
+  menuBtn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    background: '#1e293b',
+    border: '1px solid #334155',
+    borderRadius: 12,
+    padding: '20px',
+    cursor: 'pointer',
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#e2e8f0',
+    transition: 'all 0.2s',
+  },
+  menuBtnIcon: {
+    fontSize: 32,
+  },
+  menuBtnLabel: {
+    textAlign: 'center',
+  },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -234,6 +307,17 @@ const styles = {
   },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 16 },
   headerRight: { display: 'flex', gap: 8 },
+  backBtn: {
+    background: 'transparent',
+    border: 'none',
+    color: '#94a3b8',
+    fontSize: 14,
+    cursor: 'pointer',
+    padding: '8px 12px',
+    borderRadius: 6,
+    fontWeight: 500,
+    transition: 'all 0.15s',
+  },
   title: { fontSize: 18, fontWeight: 700, color: '#f1f5f9' },
   nav: {
     display: 'flex',
@@ -324,5 +408,14 @@ const styles = {
     cursor: 'pointer',
     fontSize: 18,
     fontWeight: 600,
+  },
+  placeholder: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    color: '#94a3b8',
+    fontSize: 16,
   },
 }
