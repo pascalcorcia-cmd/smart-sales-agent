@@ -26,9 +26,13 @@ def web_search(query: str, max_results: int = 5) -> str:
     try:
         with DDGS() as ddgs:
             # ponytail: backend="auto" fans out to 8 search engines per call (many
-            # 429 from cloud IPs), turning one search into 10-20s. Pin to the one
-            # engine that responds reliably; widen if duckduckgo itself starts failing.
-            results = list(ddgs.text(query, max_results=max_results, backend="duckduckgo"))
+            # 429 from cloud IPs), turning one search into 10-20s. A single pinned
+            # engine is a single point of failure for a scraping-based tool --
+            # duckduckgo alone got blocked from Railway's IP after working fine
+            # for a while. Two diverse engines tried concurrently: still fast
+            # (~1s), survives either one getting blocked. Widen further (add a
+            # 3rd) if both start failing from the deployed IP.
+            results = list(ddgs.text(query, max_results=max_results, backend="duckduckgo,brave"))
         if not results:
             return json.dumps({"status": "no_results", "message": "Aucun résultat trouvé"})
         formatted = []
