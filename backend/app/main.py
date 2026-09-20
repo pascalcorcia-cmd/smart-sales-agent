@@ -6,7 +6,7 @@ import logging
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import UPLOAD_DIR, CORS_ORIGINS, ENVIRONMENT, DB_PATH
@@ -65,6 +65,14 @@ def get_files():
         if os.path.isfile(filepath):
             files.append({"name": f, "size_kb": round(os.path.getsize(filepath) / 1024, 1)})
     return {"files": files}
+
+
+@app.get("/api/files/{filename}")
+def download_file(filename: str):
+    filepath = os.path.join(UPLOAD_DIR, os.path.basename(filename))
+    if not os.path.isfile(filepath):
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    return FileResponse(filepath, filename=os.path.basename(filename))
 
 
 def _meeting_row_to_dict(row):
@@ -129,8 +137,6 @@ def delete_meeting(meeting_id: str):
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 if os.path.isdir(STATIC_DIR):
-    from fastapi.responses import FileResponse
-
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
 
     @app.get("/{full_path:path}")

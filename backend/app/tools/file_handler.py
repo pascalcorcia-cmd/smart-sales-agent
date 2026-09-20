@@ -103,10 +103,11 @@ def _dataframe_summary(df: pd.DataFrame, max_rows: int) -> str:
 
 def write_file(filename: str, content: str) -> str:
     filepath = _safe_path(filename)
+    basename = os.path.basename(filename)
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
-        return json.dumps({"status": "success", "message": f"Fichier '{filename}' créé", "path": filepath})
+        return json.dumps({"status": "success", "message": f"Fichier '{basename}' créé", "filename": basename})
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)})
 
