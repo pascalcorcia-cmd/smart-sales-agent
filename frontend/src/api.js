@@ -50,3 +50,31 @@ export async function getFiles() {
   const res = await fetch(`${API_BASE}/files`);
   return res.json();
 }
+
+export async function getMeetings() {
+  const res = await fetch(`${API_BASE}/meetings`);
+  return res.json();
+}
+
+export async function createMeeting(meeting) {
+  const res = await fetch(`${API_BASE}/meetings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(meeting),
+  });
+  return res.json();
+}
+
+export async function updateMeeting(id, update) {
+  const res = await fetch(`${API_BASE}/meetings/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(update),
+  });
+  return res.json();
+}
+
+export async function deleteMeeting(id) {
+  const res = await fetch(`${API_BASE}/meetings/${id}`, { method: 'DELETE' });
+  return res.json();
+}

@@ -26,6 +26,18 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS meetings (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            company TEXT,
+            contact_name TEXT,
+            meeting_date TEXT,
+            notes TEXT,
+            status TEXT NOT NULL DEFAULT 'planifie',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
 

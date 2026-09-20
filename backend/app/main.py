@@ -1,14 +1,16 @@
 import os
 import shutil
+import sqlite3
+import uuid
 import logging
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import UPLOAD_DIR, CORS_ORIGINS, ENVIRONMENT
-from app.models import ChatRequest
+from app.config import UPLOAD_DIR, CORS_ORIGINS, ENVIRONMENT, DB_PATH
+from app.models import ChatRequest, Meeting, MeetingUpdate
 from app.agent import run_agent, stream_agent
 
 logging.basicConfig(level=logging.INFO)
@@ -63,6 +65,66 @@ def get_files():
         if os.path.isfile(filepath):
             files.append({"name": f, "size_kb": round(os.path.getsize(filepath) / 1024, 1)})
     return {"files": files}
+
+
+def _meeting_row_to_dict(row):
+    return {
+        "id": row[0], "title": row[1], "company": row[2], "contact_name": row[3],
+        "meeting_date": row[4], "notes": row[5], "status": row[6], "created_at": row[7],
+    }
+
+
+@app.get("/api/meetings")
+def list_meetings():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, title, company, contact_name, meeting_date, notes, status, created_at "
+        "FROM meetings ORDER BY meeting_date IS NULL, meeting_date ASC"
+    ).fetchall()
+    conn.close()
+    return {"meetings": [_meeting_row_to_dict(r) for r in rows]}
+
+
+@app.post("/api/meetings")
+def create_meeting(meeting: Meeting):
+    mid = str(uuid.uuid4())
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT INTO meetings (id, title, company, contact_name, meeting_date, notes, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (mid, meeting.title, meeting.company, meeting.contact_name, meeting.meeting_date, meeting.notes, meeting.status),
+    )
+    conn.commit()
+    conn.close()
+    return {"id": mid, **meeting.model_dump()}
+
+
+@app.put("/api/meetings/{meeting_id}")
+def update_meeting(meeting_id: str, update: MeetingUpdate):
+    fields = {k: v for k, v in update.model_dump().items() if v is not None}
+    if not fields:
+        raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
+
+    conn = sqlite3.connect(DB_PATH)
+    existing = conn.execute("SELECT id FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Réunion introuvable")
+
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    conn.execute(f"UPDATE meetings SET {set_clause} WHERE id = ?", (*fields.values(), meeting_id))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+@app.delete("/api/meetings/{meeting_id}")
+def delete_meeting(meeting_id: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
 
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")

@@ -4,6 +4,8 @@ import MessageBubble from './components/MessageBubble'
 import ToolOutput from './components/ToolOutput'
 import FileUpload from './components/FileUpload'
 import AccountPlan from './components/AccountPlan'
+import PromptTool from './components/PromptTool'
+import MeetingManager from './components/MeetingManager'
 
 const TABS = [
   { id: 'chat', label: 'Chat IA', icon: '💬' },
@@ -224,19 +226,50 @@ export default function App() {
       )}
 
       {activeTab === 'account-plan' && <AccountPlan />}
-      {activeTab === 'prep-rdv' && <TabPlaceholder label="Préparation RDV" />}
-      {activeTab === 'qualify' && <TabPlaceholder label="Qualification Leads" />}
-      {activeTab === 'manage-meetings' && <TabPlaceholder label="Gestion Réunions" />}
-      {activeTab === 'prospecting-email' && <TabPlaceholder label="Rédiger des emails de prospection" />}
-    </div>
-  )
-}
 
-function TabPlaceholder({ label }) {
-  return (
-    <div style={styles.placeholder}>
-      <h2>{label}</h2>
-      <p>Fonctionnalité en développement...</p>
+      {activeTab === 'prep-rdv' && (
+        <PromptTool
+          title="Préparation RDV"
+          subtitle="Générez un brief complet avant votre rendez-vous commercial."
+          submitLabel="Générer le brief"
+          fields={[
+            { key: 'companyName', label: "Nom de l'entreprise", placeholder: 'Ex: Salesforce', required: true },
+            { key: 'companyUrl', label: 'URL du site web', placeholder: 'https://www.example.com', required: false },
+            { key: 'context', label: 'Contexte du RDV', type: 'textarea', placeholder: 'Objectif, participants, sujets à aborder...', required: false },
+          ]}
+          buildPrompt={(v) => `Prépare un brief de rendez-vous complet pour ${v.companyName}${v.companyUrl ? ` (${v.companyUrl})` : ''}.${v.context ? `\nContexte fourni : ${v.context}` : ''}\nInclus : résumé entreprise, points clés à aborder, questions à poser, pièges à éviter, stratégie de négo.`}
+        />
+      )}
+
+      {activeTab === 'qualify' && (
+        <PromptTool
+          title="Qualification Leads"
+          subtitle="Qualifiez un lead avec les frameworks BANT et MEDDPICC."
+          submitLabel="Qualifier le lead"
+          fields={[
+            { key: 'companyName', label: "Nom de l'entreprise", placeholder: 'Ex: Salesforce', required: true },
+            { key: 'companyUrl', label: 'URL du site web', placeholder: 'https://www.example.com', required: false },
+            { key: 'context', label: 'Informations connues', type: 'textarea', placeholder: 'Budget évoqué, délai, interlocuteurs, besoin exprimé...', required: false },
+          ]}
+          buildPrompt={(v) => `Qualifie le lead ${v.companyName}${v.companyUrl ? ` (${v.companyUrl})` : ''} avec les frameworks BANT et MEDDPICC.${v.context ? `\nInformations connues : ${v.context}` : ''}\nScore chaque dimension. Identifie les buying signals et red flags.`}
+        />
+      )}
+
+      {activeTab === 'manage-meetings' && <MeetingManager />}
+
+      {activeTab === 'prospecting-email' && (
+        <PromptTool
+          title="Rédiger des emails de prospection"
+          subtitle="Générez une séquence d'emails de prospection personnalisée."
+          submitLabel="Générer les emails"
+          fields={[
+            { key: 'companyName', label: "Nom de l'entreprise cible", placeholder: 'Ex: Salesforce', required: true },
+            { key: 'contactName', label: 'Nom du contact', placeholder: 'Ex: Jean Dupont, Directeur Commercial', required: false },
+            { key: 'context', label: 'Contexte / offre', type: 'textarea', placeholder: 'Votre produit, la valeur ajoutée pour ce prospect...', required: false },
+          ]}
+          buildPrompt={(v) => `Crée une séquence de 3 emails de prospection pour ${v.companyName}${v.contactName ? `, à destination de ${v.contactName}` : ''} : cold outreach, follow-up, break-up.${v.context ? `\nContexte : ${v.context}` : ''}\nPersonnalise avec une recherche sur l'entreprise si besoin.`}
+        />
+      )}
     </div>
   )
 }
@@ -408,14 +441,5 @@ const styles = {
     cursor: 'pointer',
     fontSize: 18,
     fontWeight: 600,
-  },
-  placeholder: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    color: '#94a3b8',
-    fontSize: 16,
   },
 }
