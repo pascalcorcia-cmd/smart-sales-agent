@@ -7,6 +7,15 @@ const STATUSES = {
   annule: { label: 'Annulé', color: '#64748b' },
 }
 
+// Mirrors the backend's ORDER BY meeting_date IS NULL, meeting_date ASC
+// so a local insert lands in the same slot a reload would put it in.
+const sortMeetings = (list) => [...list].sort((a, b) => {
+  if (!a.meeting_date && !b.meeting_date) return 0
+  if (!a.meeting_date) return 1
+  if (!b.meeting_date) return -1
+  return a.meeting_date.localeCompare(b.meeting_date)
+})
+
 export default function MeetingManager() {
   const [meetings, setMeetings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -25,22 +34,22 @@ export default function MeetingManager() {
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!form.title.trim()) return
-    await createMeeting(form)
+    const created = await createMeeting(form)
+    setMeetings(prev => sortMeetings([...prev, created]))
     setForm({ title: '', company: '', contact_name: '', meeting_date: '', notes: '' })
     setShowForm(false)
-    load()
   }
 
   const cycleStatus = async (meeting) => {
     const order = ['planifie', 'fait', 'annule']
     const next = order[(order.indexOf(meeting.status) + 1) % order.length]
     await updateMeeting(meeting.id, { status: next })
-    load()
+    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, status: next } : m))
   }
 
   const handleDelete = async (id) => {
     await deleteMeeting(id)
-    load()
+    setMeetings(prev => prev.filter(m => m.id !== id))
   }
 
   return (

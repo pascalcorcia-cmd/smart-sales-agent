@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { streamMessage, uploadFile } from './api'
+import { streamMessage, uploadFile, createTextBatcher } from './api'
 import MessageBubble from './components/MessageBubble'
 import ToolOutput from './components/ToolOutput'
 import FileUpload from './components/FileUpload'
@@ -42,10 +42,18 @@ export default function App() {
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
 
-    let assistantContent = ''
     let toolCalls = []
 
     setMessages(prev => [...prev, { role: 'assistant', content: '', toolCalls: [], streaming: true }])
+
+    const textBatcher = createTextBatcher((content) => {
+      setMessages(prev => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        updated[updated.length - 1] = { ...last, content }
+        return updated
+      })
+    })
 
     try {
       await streamMessage(userMsg, conversationId, (event) => {
@@ -54,13 +62,7 @@ export default function App() {
             setConversationId(event.data)
             break
           case 'text':
-            assistantContent += event.data
-            setMessages(prev => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              updated[updated.length - 1] = { ...last, content: assistantContent }
-              return updated
-            })
+            textBatcher.append(event.data)
             break
           case 'tool_start':
             toolCalls.push({ tool: event.data.tool, status: 'running' })
@@ -85,6 +87,7 @@ export default function App() {
             })
             break
           case 'done':
+            textBatcher.flushNow()
             setMessages(prev => {
               const updated = [...prev]
               const last = updated[updated.length - 1]

@@ -34,6 +34,9 @@ CALL_API_TOOL = {
 }
 
 
+MAX_RESPONSE_CHARS = 20000
+
+
 def call_api(url: str, method: str = "GET", headers: dict | None = None, body: dict | None = None) -> str:
     try:
         h = headers or {}
@@ -46,16 +49,21 @@ def call_api(url: str, method: str = "GET", headers: dict | None = None, body: d
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 data_raw = response.read().decode()
+                truncated = len(data_raw) > MAX_RESPONSE_CHARS
                 try:
-                    data = json.loads(data_raw)
+                    data = json.loads(data_raw) if not truncated else data_raw[:MAX_RESPONSE_CHARS]
                 except:
-                    data = data_raw[:5000]
+                    data = data_raw[:MAX_RESPONSE_CHARS]
 
-                return json.dumps({
+                result = {
                     "status": "success",
                     "status_code": response.status,
-                    "data": data
-                }, ensure_ascii=False, default=str)
+                    "data": data,
+                }
+                if truncated:
+                    result["truncated"] = True
+                    result["original_size_chars"] = len(data_raw)
+                return json.dumps(result, ensure_ascii=False, default=str)
         except urllib.error.HTTPError as e:
             return json.dumps({
                 "status": "error",

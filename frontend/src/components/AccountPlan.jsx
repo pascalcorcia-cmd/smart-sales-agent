@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { streamMessage, uploadFile, exportPptx } from '../api'
+import { streamMessage, uploadFile, exportPptx, createTextBatcher } from '../api'
 import MessageBubble from './MessageBubble'
 import ToolOutput from './ToolOutput'
 
@@ -11,7 +11,7 @@ const MODULES = [
   { id: 'contacts', label: 'Decision Makers', icon: '👥', skill: 'sales-contacts', desc: 'Cartographie des décideurs' },
   { id: 'competitors', label: 'Veille Concurrentielle', icon: '⚔️', skill: 'sales-competitors', desc: 'Battle cards et positionnement' },
   { id: 'prep', label: 'Prép. Rendez-vous', icon: '📋', skill: 'sales-prep', desc: 'Brief complet avant meeting' },
-  { id: 'brief', label: 'Brief Express', icon: '📝', skill: 'sales-brief', desc: 'Résumé 1 page avant un RDV' },
+  { id: 'brief', label: 'Brief Express', icon: '📝', skill: 'sales-brief', desc: 'Résumé 1 page avant un RDV', model: 'claude-haiku-4-5-20251001' },
   { id: 'outreach', label: 'Séquence Outreach', icon: '✉️', skill: 'sales-outreach', desc: 'Emails de prospection personnalisés' },
   { id: 'objections', label: 'Objections', icon: '🛡️', skill: 'sales-objections', desc: 'Playbook de réponses aux objections' },
   { id: 'proposal', label: 'Proposition Commerciale', icon: '📄', skill: 'sales-proposal', desc: 'Générer une proposition client' },
@@ -28,7 +28,6 @@ export default function AccountPlan() {
   const [results, setResults] = useState({})
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
-  const [conversationId, setConversationId] = useState(null)
   const [progress, setProgress] = useState(0)
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -114,20 +113,27 @@ export default function AccountPlan() {
 
       setMessages(prev => [...prev, { role: 'assistant', content: '', toolCalls: [], streaming: true }])
 
+      const textBatcher = createTextBatcher((content) => {
+        assistantContent = content
+        setMessages(prev => {
+          const updated = [...prev]
+          const last = updated[updated.length - 1]
+          updated[updated.length - 1] = { ...last, content }
+          return updated
+        })
+      })
+
       try {
-        await streamMessage(prompt, conversationId, (event) => {
+        // Each module gets its own fresh conversation (no conversation_id reuse):
+        // buildPrompt() already carries forward a truncated summary of prior
+        // modules via previousResults, so chaining the full conversation on top
+        // of that was paying for the same context twice and made later modules
+        // resend every earlier module's full prompt+response as history (O(n^2)
+        // tokens across a 13-module run).
+        await streamMessage(prompt, null, (event) => {
           switch (event.type) {
-            case 'conversation_id':
-              setConversationId(event.data)
-              break
             case 'text':
-              assistantContent += event.data
-              setMessages(prev => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                updated[updated.length - 1] = { ...last, content: assistantContent }
-                return updated
-              })
+              textBatcher.append(event.data)
               break
             case 'tool_start':
               toolCalls.push({ tool: event.data.tool, status: 'running' })
@@ -152,6 +158,7 @@ export default function AccountPlan() {
               })
               break
             case 'done':
+              textBatcher.flushNow()
               setMessages(prev => {
                 const updated = [...prev]
                 const last = updated[updated.length - 1]
@@ -168,7 +175,7 @@ export default function AccountPlan() {
               })
               break
           }
-        })
+        }, mod.model)
 
         setResults(prev => ({ ...prev, [mod.id]: assistantContent }))
       } catch (err) {

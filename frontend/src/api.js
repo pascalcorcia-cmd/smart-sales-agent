@@ -9,11 +9,11 @@ export async function sendMessage(message, conversationId) {
   return res.json();
 }
 
-export async function streamMessage(message, conversationId, onEvent) {
+export async function streamMessage(message, conversationId, onEvent, model) {
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, conversation_id: conversationId }),
+    body: JSON.stringify({ message, conversation_id: conversationId, model: model || undefined }),
   });
 
   const reader = res.body.getReader();
@@ -37,6 +37,25 @@ export async function streamMessage(message, conversationId, onEvent) {
       }
     }
   }
+}
+
+// Coalesces rapid 'text' deltas into at most one state update per animation
+// frame instead of one per token -- streaming a long response was triggering
+// a full message-list re-render (and a full markdown re-parse) per delta.
+export function createTextBatcher(onFlush) {
+  let content = '';
+  let scheduled = false;
+  const flush = () => { scheduled = false; onFlush(content); };
+  return {
+    append(delta) {
+      content += delta;
+      if (!scheduled) {
+        scheduled = true;
+        requestAnimationFrame(flush);
+      }
+    },
+    flushNow() { flush(); },
+  };
 }
 
 export async function uploadFile(file) {

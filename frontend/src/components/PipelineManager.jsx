@@ -30,20 +30,22 @@ export default function PipelineManager() {
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!form.company.trim()) return
-    await createDeal({ ...form, value: form.value ? parseFloat(form.value) : null })
+    const created = await createDeal({ ...form, value: form.value ? parseFloat(form.value) : null })
+    // Backend lists deals by created_at DESC (newest first) -- prepending
+    // matches that without needing the server-assigned timestamp back.
+    setDeals(prev => [created, ...prev])
     setForm({ company: '', contact_name: '', stage: 'prospection', value: '', close_date: '', notes: '' })
     setShowForm(false)
-    load()
   }
 
   const changeStage = async (deal, stage) => {
     await updateDeal(deal.id, { stage })
-    load()
+    setDeals(prev => prev.map(d => d.id === deal.id ? { ...d, stage } : d))
   }
 
   const handleDelete = async (id) => {
     await deleteDeal(id)
-    load()
+    setDeals(prev => prev.filter(d => d.id !== id))
   }
 
   const totalValue = deals

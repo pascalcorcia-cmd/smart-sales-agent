@@ -11,7 +11,7 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "conversations.db")
 MAX_ITERATIONS = 10
-MAX_TOKENS = 4096
+MAX_TOKENS = 8192
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)

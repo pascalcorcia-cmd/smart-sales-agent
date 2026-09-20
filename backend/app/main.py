@@ -38,14 +38,14 @@ def health():
 
 @app.post("/api/chat")
 def chat(request: ChatRequest):
-    result = run_agent(request.conversation_id, request.message)
+    result = run_agent(request.conversation_id, request.message, request.model)
     return result
 
 
 @app.post("/api/chat/stream")
 def chat_stream(request: ChatRequest):
     return StreamingResponse(
-        stream_agent(request.conversation_id, request.message),
+        stream_agent(request.conversation_id, request.message, request.model),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

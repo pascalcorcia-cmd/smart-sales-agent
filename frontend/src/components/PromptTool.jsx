@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { streamMessage, exportDocx } from '../api'
+import { streamMessage, exportDocx, createTextBatcher } from '../api'
 import MessageBubble from './MessageBubble'
 import ToolOutput from './ToolOutput'
 
-export default function PromptTool({ title, subtitle, fields, buildPrompt, submitLabel }) {
+export default function PromptTool({ title, subtitle, fields, buildPrompt, submitLabel, model }) {
   const [values, setValues] = useState({})
   const [step, setStep] = useState('form')
   const [messages, setMessages] = useState([])
@@ -19,19 +19,21 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
     setLoading(true)
     setMessages([{ role: 'assistant', content: '', toolCalls: [], streaming: true }])
 
-    let assistantContent = ''
     let toolCalls = []
+
+    const textBatcher = createTextBatcher((content) => {
+      setMessages(prev => {
+        const updated = [...prev]
+        updated[0] = { ...updated[0], content }
+        return updated
+      })
+    })
 
     try {
       await streamMessage(buildPrompt(values), null, (event) => {
         switch (event.type) {
           case 'text':
-            assistantContent += event.data
-            setMessages(prev => {
-              const updated = [...prev]
-              updated[0] = { ...updated[0], content: assistantContent }
-              return updated
-            })
+            textBatcher.append(event.data)
             break
           case 'tool_start':
             toolCalls.push({ tool: event.data.tool, status: 'running' })
@@ -54,6 +56,7 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
             })
             break
           case 'done':
+            textBatcher.flushNow()
             setMessages(prev => {
               const updated = [...prev]
               updated[0] = { ...updated[0], streaming: false }
@@ -68,7 +71,7 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
             })
             break
         }
-      })
+      }, model)
     } catch (err) {
       setMessages([{ role: 'assistant', content: `Erreur: ${err.message}`, streaming: false }])
     }

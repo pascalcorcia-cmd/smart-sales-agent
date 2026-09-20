@@ -11,6 +11,14 @@ from app.tools import ALL_TOOLS, TOOL_HANDLERS
 logger = logging.getLogger(__name__)
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+# Cached: system prompt + tool definitions are identical on every single API
+# call this app makes (every loop iteration, every module, every turn).
+# cache_control marks the prefix [tools, system] as cacheable so repeat calls
+# only pay full price for the part that actually changes (the messages).
+SYSTEM_PROMPT_CACHED = [
+    {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+]
+
 
 def get_or_create_conversation(conversation_id: str | None) -> tuple[str, list[dict]]:
     cid = conversation_id or str(uuid.uuid4())
@@ -51,7 +59,10 @@ def _serialize_content(content: list) -> list[dict]:
     return [block.model_dump() for block in content]
 
 
-def run_agent(conversation_id: str | None, user_message: str) -> dict:
+TRUNCATION_NOTICE = "\n\n⚠️ *Réponse tronquée (limite de tokens atteinte) — redemande une version plus concise ou en plusieurs parties si besoin.*"
+
+
+def run_agent(conversation_id: str | None, user_message: str, model: str | None = None) -> dict:
     cid, messages = get_or_create_conversation(conversation_id)
     messages.append({"role": "user", "content": user_message})
     tool_calls_log = []
@@ -59,9 +70,9 @@ def run_agent(conversation_id: str | None, user_message: str) -> dict:
     for _ in range(MAX_ITERATIONS):
         try:
             response = client.messages.create(
-                model=CLAUDE_MODEL,
+                model=model or CLAUDE_MODEL,
                 max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT,
+                system=SYSTEM_PROMPT_CACHED,
                 tools=ALL_TOOLS,
                 messages=messages,
             )
@@ -93,6 +104,9 @@ def run_agent(conversation_id: str | None, user_message: str) -> dict:
                 for block in response.content:
                     if hasattr(block, "text"):
                         text_response += block.text
+                if response.stop_reason == "max_tokens":
+                    logger.warning(f"run_agent: response truncated at MAX_TOKENS for conversation {cid}")
+                    text_response += TRUNCATION_NOTICE
 
                 return {
                     "response": text_response,
@@ -115,7 +129,7 @@ def run_agent(conversation_id: str | None, user_message: str) -> dict:
     }
 
 
-def stream_agent(conversation_id: str | None, user_message: str):
+def stream_agent(conversation_id: str | None, user_message: str, model: str | None = None):
     """Generator that yields SSE events for streaming responses."""
     cid, messages = get_or_create_conversation(conversation_id)
     messages.append({"role": "user", "content": user_message})
@@ -126,9 +140,9 @@ def stream_agent(conversation_id: str | None, user_message: str):
     for _ in range(MAX_ITERATIONS):
         try:
             with client.messages.stream(
-                model=CLAUDE_MODEL,
+                model=model or CLAUDE_MODEL,
                 max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT,
+                system=SYSTEM_PROMPT_CACHED,
                 tools=ALL_TOOLS,
                 messages=messages,
             ) as stream:
@@ -166,6 +180,9 @@ def stream_agent(conversation_id: str | None, user_message: str):
             else:
                 messages.append({"role": "assistant", "content": _serialize_content(response.content)})
                 _save_conversation(cid, messages)
+                if response.stop_reason == "max_tokens":
+                    logger.warning(f"stream_agent: response truncated at MAX_TOKENS for conversation {cid}")
+                    yield f"data: {json.dumps({'type': 'text', 'data': TRUNCATION_NOTICE}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'done', 'data': {'tool_calls': tool_calls_log if tool_calls_log else None}})}\n\n"
                 return
         except Exception as e:
