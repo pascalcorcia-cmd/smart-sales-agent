@@ -33,3 +33,13 @@ class MeetingUpdate(BaseModel):
 class DocxExportRequest(BaseModel):
     title: str
     content: str
+
+
+class PptxSection(BaseModel):
+    title: str
+    content: str
+
+
+class PptxExportRequest(BaseModel):
+    title: str
+    sections: list[PptxSection]

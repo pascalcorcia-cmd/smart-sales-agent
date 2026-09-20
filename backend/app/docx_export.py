@@ -1,21 +1,13 @@
 import io
-import re
 
 from docx import Document
 
-BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+from app.markdown_blocks import parse_blocks, split_bold
 
 
 def _add_inline_runs(paragraph, text: str):
-    """Split text on **bold** markers and add runs accordingly."""
-    pos = 0
-    for m in BOLD_RE.finditer(text):
-        if m.start() > pos:
-            paragraph.add_run(text[pos:m.start()])
-        paragraph.add_run(m.group(1)).bold = True
-        pos = m.end()
-    if pos < len(text):
-        paragraph.add_run(text[pos:])
+    for segment, bold in split_bold(text):
+        paragraph.add_run(segment).bold = bold or None
 
 
 def _add_table(doc: Document, rows: list[list[str]]):
@@ -28,7 +20,7 @@ def _add_table(doc: Document, rows: list[list[str]]):
         for c, val in enumerate(row):
             if c < len(cells):
                 cell_p = cells[c].paragraphs[0]
-                _add_inline_runs(cell_p, val.strip())
+                _add_inline_runs(cell_p, val)
                 if r == 0:
                     for run in cell_p.runs:
                         run.bold = True
@@ -39,41 +31,22 @@ def markdown_to_docx(title: str, content: str) -> io.BytesIO:
     doc = Document()
     doc.add_heading(title, level=1)
 
-    lines = content.split("\n")
-    table_buffer: list[list[str]] = []
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-
-        if line.startswith("|") and line.endswith("|"):
-            cells = [c.strip() for c in line.strip("|").split("|")]
-            if not re.fullmatch(r"\s*:?-+:?\s*", "".join(cells)):
-                table_buffer.append(cells)
-            i += 1
-            continue
-        elif table_buffer:
-            _add_table(doc, table_buffer)
-            table_buffer = []
-
-        if not line:
-            pass
-        elif line.startswith("### "):
-            doc.add_heading(line[4:], level=3)
-        elif line.startswith("## "):
-            doc.add_heading(line[3:], level=2)
-        elif line.startswith("# "):
-            doc.add_heading(line[2:], level=1)
-        elif line.startswith(("- ", "* ")):
-            _add_inline_runs(doc.add_paragraph(style="List Bullet"), line[2:])
-        elif re.match(r"^\d+\.\s", line):
-            _add_inline_runs(doc.add_paragraph(style="List Number"), re.sub(r"^\d+\.\s", "", line))
+    for block in parse_blocks(content):
+        t = block["type"]
+        if t == "table":
+            _add_table(doc, block["rows"])
+        elif t == "h1":
+            doc.add_heading(block["text"], level=1)
+        elif t == "h2":
+            doc.add_heading(block["text"], level=2)
+        elif t == "h3":
+            doc.add_heading(block["text"], level=3)
+        elif t == "bullet":
+            _add_inline_runs(doc.add_paragraph(style="List Bullet"), block["text"])
+        elif t == "number":
+            _add_inline_runs(doc.add_paragraph(style="List Number"), block["text"])
         else:
-            _add_inline_runs(doc.add_paragraph(), line)
-
-        i += 1
-
-    if table_buffer:
-        _add_table(doc, table_buffer)
+            _add_inline_runs(doc.add_paragraph(), block["text"])
 
     buffer = io.BytesIO()
     doc.save(buffer)

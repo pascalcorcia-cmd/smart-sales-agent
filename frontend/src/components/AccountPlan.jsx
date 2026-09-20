@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { streamMessage, uploadFile } from '../api'
+import { streamMessage, uploadFile, exportPptx } from '../api'
 import MessageBubble from './MessageBubble'
 import ToolOutput from './ToolOutput'
 
@@ -29,6 +29,7 @@ export default function AccountPlan() {
   const [progress, setProgress] = useState(0)
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const fileInputRef = useRef(null)
 
   const handleFiles = async (fileList) => {
@@ -181,6 +182,19 @@ export default function AccountPlan() {
     }])
   }
 
+  const handleExportPptx = async () => {
+    setExporting(true)
+    try {
+      const sections = MODULES
+        .filter(m => results[m.id])
+        .map(m => ({ title: m.label, content: results[m.id] }))
+      await exportPptx(`Account Plan : ${companyName}`, sections)
+    } catch (err) {
+      alert('Erreur export PowerPoint: ' + err.message)
+    }
+    setExporting(false)
+  }
+
   if (step === 'form') {
     return (
       <div style={styles.container}>
@@ -305,9 +319,16 @@ export default function AccountPlan() {
           <p style={styles.runningUrl}>{companyUrl}</p>
         </div>
         {!loading && (
-          <button onClick={() => { setStep('form'); setMessages([]); setResults({}) }} style={styles.backBtn}>
-            Nouveau plan
-          </button>
+          <div style={styles.runningActions}>
+            {Object.keys(results).length > 0 && (
+              <button onClick={handleExportPptx} disabled={exporting} style={styles.exportBtn}>
+                {exporting ? 'Export...' : '📊 Exporter en PowerPoint'}
+              </button>
+            )}
+            <button onClick={() => { setStep('form'); setMessages([]); setResults({}) }} style={styles.backBtn}>
+              Nouveau plan
+            </button>
+          </div>
         )}
       </div>
 
@@ -433,6 +454,18 @@ const styles = {
   },
   runningTitle: { fontSize: 18, fontWeight: 700, color: '#f1f5f9', margin: 0 },
   runningUrl: { fontSize: 12, color: '#64748b', margin: '4px 0 0' },
+  runningActions: { display: 'flex', gap: 8 },
+  exportBtn: {
+    background: '#6366f1',
+    border: 'none',
+    borderRadius: 8,
+    padding: '8px 16px',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: 'inherit',
+  },
   backBtn: {
     background: '#1e293b',
     border: '1px solid #334155',

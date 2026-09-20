@@ -79,18 +79,31 @@ export async function deleteMeeting(id) {
   return res.json();
 }
 
+async function downloadBlob(res, title, ext) {
+  if (!res.ok) throw new Error(`Export ${ext} échoué`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${title.replace(/[^\w\-]+/g, '_')}.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function exportDocx(title, content) {
   const res = await fetch(`${API_BASE}/export/docx`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, content }),
   });
-  if (!res.ok) throw new Error('Export Word échoué');
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${title.replace(/[^\w\-]+/g, '_')}.docx`;
-  a.click();
-  URL.revokeObjectURL(url);
+  await downloadBlob(res, title, 'docx');
+}
+
+export async function exportPptx(title, sections) {
+  const res = await fetch(`${API_BASE}/export/pptx`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, sections }),
+  });
+  await downloadBlob(res, title, 'pptx');
 }

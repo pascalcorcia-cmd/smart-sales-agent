@@ -11,9 +11,10 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import UPLOAD_DIR, CORS_ORIGINS, ENVIRONMENT, DB_PATH
-from app.models import ChatRequest, Meeting, MeetingUpdate, DocxExportRequest
+from app.models import ChatRequest, Meeting, MeetingUpdate, DocxExportRequest, PptxExportRequest
 from app.agent import run_agent, stream_agent
 from app.docx_export import markdown_to_docx
+from app.pptx_export import markdown_to_pptx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -85,6 +86,17 @@ def export_docx(request: DocxExportRequest):
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.docx"'},
+    )
+
+
+@app.post("/api/export/pptx")
+def export_pptx(request: PptxExportRequest):
+    buffer = markdown_to_pptx(request.title, [s.model_dump() for s in request.sections])
+    safe_name = re.sub(r"[^\w\-]+", "_", request.title).strip("_") or "presentation"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.pptx"'},
     )
 
 
