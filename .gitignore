@@ -19,5 +19,8 @@ frontend/dist/
 # Uploads
 uploads/
 
+# Local databases
+*.db
+
 # Production build
 backend/static/
