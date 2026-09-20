@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import UPLOAD_DIR, CORS_ORIGINS, ENVIRONMENT, DB_PATH
-from app.models import ChatRequest, Meeting, MeetingUpdate, DocxExportRequest, PptxExportRequest
+from app.models import ChatRequest, Meeting, MeetingUpdate, Deal, DealUpdate, DocxExportRequest, PptxExportRequest
 from app.agent import run_agent, stream_agent
 from app.docx_export import markdown_to_docx
 from app.pptx_export import markdown_to_pptx
@@ -155,6 +155,66 @@ def update_meeting(meeting_id: str, update: MeetingUpdate):
 def delete_meeting(meeting_id: str):
     conn = sqlite3.connect(DB_PATH)
     conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+def _deal_row_to_dict(row):
+    return {
+        "id": row[0], "company": row[1], "contact_name": row[2], "stage": row[3],
+        "value": row[4], "close_date": row[5], "notes": row[6], "created_at": row[7],
+    }
+
+
+@app.get("/api/deals")
+def list_deals():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, company, contact_name, stage, value, close_date, notes, created_at "
+        "FROM deals ORDER BY created_at DESC"
+    ).fetchall()
+    conn.close()
+    return {"deals": [_deal_row_to_dict(r) for r in rows]}
+
+
+@app.post("/api/deals")
+def create_deal(deal: Deal):
+    did = str(uuid.uuid4())
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT INTO deals (id, company, contact_name, stage, value, close_date, notes) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (did, deal.company, deal.contact_name, deal.stage, deal.value, deal.close_date, deal.notes),
+    )
+    conn.commit()
+    conn.close()
+    return {"id": did, **deal.model_dump()}
+
+
+@app.put("/api/deals/{deal_id}")
+def update_deal(deal_id: str, update: DealUpdate):
+    fields = {k: v for k, v in update.model_dump().items() if v is not None}
+    if not fields:
+        raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
+
+    conn = sqlite3.connect(DB_PATH)
+    existing = conn.execute("SELECT id FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Deal introuvable")
+
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    conn.execute(f"UPDATE deals SET {set_clause} WHERE id = ?", (*fields.values(), deal_id))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+@app.delete("/api/deals/{deal_id}")
+def delete_deal(deal_id: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("DELETE FROM deals WHERE id = ?", (deal_id,))
     conn.commit()
     conn.close()
     return {"status": "ok"}

@@ -5,6 +5,7 @@ import ToolOutput from './ToolOutput'
 
 const MODULES = [
   { id: 'research', label: 'Recherche Entreprise', icon: '🔍', skill: 'sales-research', desc: 'Firmographics, business model, tech stack, funding' },
+  { id: 'triggers', label: 'Signaux d\'Achat', icon: '⚡', skill: 'trigger-event-detection', desc: 'Levées de fonds, recrutements, changements de direction' },
   { id: 'prospect', label: 'Analyse Prospect', icon: '🎯', skill: 'sales-prospect', desc: 'Audit complet avec scoring 0-100' },
   { id: 'qualify', label: 'Qualification Lead', icon: '✅', skill: 'sales-qualify', desc: 'BANT + MEDDPICC scoring' },
   { id: 'contacts', label: 'Decision Makers', icon: '👥', skill: 'sales-contacts', desc: 'Cartographie des décideurs' },
@@ -20,7 +21,7 @@ export default function AccountPlan() {
   const [step, setStep] = useState('form')
   const [companyUrl, setCompanyUrl] = useState('')
   const [companyName, setCompanyName] = useState('')
-  const [selectedModules, setSelectedModules] = useState(['research', 'prospect', 'qualify', 'contacts', 'competitors'])
+  const [selectedModules, setSelectedModules] = useState(['research', 'triggers', 'prospect', 'qualify', 'contacts', 'competitors'])
   const [currentModule, setCurrentModule] = useState(null)
   const [results, setResults] = useState({})
   const [messages, setMessages] = useState([])
@@ -69,9 +70,10 @@ export default function AccountPlan() {
 
     const prompts = {
       research: `${baseContext}${filesContext}\nFais une recherche approfondie sur l'entreprise ${companyUrl}. Commence par lire les documents fournis puis complète avec la recherche web. Couvre : overview, business model, produit/techno, leadership, funding, position marché, culture, développements récents. Donne un Company Fit Score /100.`,
+      triggers: `${baseContext}${filesContext}\n${previousResults}\nDétecte les signaux d'achat (trigger events) récents chez ${companyName} (${companyUrl}) : levées de fonds, recrutements clés (surtout postes liés à ton offre), changements de direction, nouveaux produits/marchés, incidents ou problèmes publics, appels d'offres, mentions dans la presse spécialisée. Pour chaque signal détecté, explique pourquoi il représente une fenêtre d'opportunité et comment l'utiliser comme accroche. Si aucun signal fort n'est trouvé, dis-le clairement plutôt que d'en inventer.`,
       prospect: `${baseContext}${filesContext}\n${previousResults}\nFais une analyse prospect complète de ${companyUrl}. Exploite les documents fournis pour enrichir l'analyse. Donne un Prospect Score /100 avec détail par catégorie (Company Fit, Contact Access, Opportunity Quality, Competitive Position, Outreach Readiness). Identifie les 3 meilleures opportunités et les 3 risques.`,
       qualify: `${baseContext}${filesContext}\n${previousResults}\nQualifie le lead ${companyName} (${companyUrl}) avec les frameworks BANT et MEDDPICC. Utilise les documents fournis pour des données internes. Score chaque dimension. Identifie les buying signals et red flags.`,
-      contacts: `${baseContext}${filesContext}\n${previousResults}\nIdentifie les décideurs clés chez ${companyName} (${companyUrl}). Cherche dans les documents fournis les noms et contacts internes. Cartographie le buying center : Economic Buyer, Champion, Technical Evaluator, End User, Blocker. Donne les top 3 contacts prioritaires avec stratégie d'approche.`,
+      contacts: `${baseContext}${filesContext}\n${previousResults}\nIdentifie les décideurs clés chez ${companyName} (${companyUrl}) et cartographie le buying committee complet. Cherche dans les documents fournis les noms et contacts internes. Pour chaque rôle du comité d'achat — Economic Buyer, Champion, Technical Evaluator, End User, Blocker/Gatekeeper, Coach — indique : le nom (si trouvable), le niveau d'influence réel (pas juste le titre hiérarchique), ses motivations probables et ce qu'il risque de bloquer. Donne une stratégie de multi-threading : quel contact aborder en premier, dans quel ordre engager les autres, et comment éviter de dépendre d'un seul interlocuteur (single-threading risk).`,
       competitors: `${baseContext}${filesContext}\n${previousResults}\nAnalyse concurrentielle pour ${companyName} (${companyUrl}). Exploite les documents fournis pour identifier les concurrents mentionnés. Détecte les solutions actuellement utilisées, évalue les coûts de switching, crée des battle cards pour chaque concurrent détecté.`,
       prep: `${baseContext}${filesContext}\n${previousResults}\nPrépare un brief de rendez-vous complet pour ${companyName} (${companyUrl}). Intègre les données des documents fournis. Inclus : résumé entreprise, points clés à aborder, questions à poser, pièges à éviter, stratégie de négo.`,
       outreach: `${baseContext}${filesContext}\n${previousResults}\nCrée une séquence d'emails de prospection pour ${companyName}. 3 emails : cold outreach, follow-up, break-up. Personnalisés avec les données de recherche et les documents fournis.`,

@@ -6,6 +6,7 @@ import FileUpload from './components/FileUpload'
 import AccountPlan from './components/AccountPlan'
 import PromptTool from './components/PromptTool'
 import MeetingManager from './components/MeetingManager'
+import PipelineManager from './components/PipelineManager'
 
 const TABS = [
   { id: 'chat', label: 'Chat IA', icon: '💬' },
@@ -14,6 +15,8 @@ const TABS = [
   { id: 'qualify', label: 'Qualification Leads', icon: '🎯' },
   { id: 'manage-meetings', label: 'Gestion Réunions', icon: '🗓️' },
   { id: 'prospecting-email', label: 'Rédiger des emails', icon: '✉️' },
+  { id: 'followup', label: 'Relances', icon: '🔁' },
+  { id: 'pipeline', label: 'Pipeline', icon: '📈' },
 ]
 
 export default function App() {
@@ -278,6 +281,23 @@ export default function App() {
           buildPrompt={(v) => `Crée une séquence de 3 emails de prospection pour ${v.companyName}${v.contactName ? `, à destination de ${v.contactName}` : ''} : cold outreach, follow-up, break-up.${v.context ? `\nContexte : ${v.context}` : ''}\nPersonnalise avec une recherche sur l'entreprise si besoin.`}
         />
       )}
+
+      {activeTab === 'followup' && (
+        <PromptTool
+          title="Relances"
+          subtitle="Génère un message de relance adapté à la situation, sans relancer à vide."
+          submitLabel="Générer la relance"
+          fields={[
+            { key: 'companyName', label: "Nom de l'entreprise", placeholder: 'Ex: Salesforce', required: true },
+            { key: 'contactName', label: 'Nom du contact', placeholder: 'Ex: Jean Dupont', required: false },
+            { key: 'lastInteraction', label: 'Dernier échange', type: 'textarea', placeholder: 'Ce qui a été dit/promis lors du dernier contact, date approximative...', required: true },
+            { key: 'silenceDuration', label: 'Depuis combien de temps sans réponse ?', placeholder: 'Ex: 10 jours', required: false },
+          ]}
+          buildPrompt={(v) => `Rédige un message de relance pour ${v.companyName}${v.contactName ? `, à destination de ${v.contactName}` : ''}.\nDernier échange : ${v.lastInteraction}${v.silenceDuration ? `\nSilence depuis : ${v.silenceDuration}` : ''}\nÉvite les relances génériques ("je reviens vers vous") : apporte une vraie raison de recontacter (nouvel élément, question précise, ressource utile). Propose 2 variantes : une courte et directe, une plus contextuelle. Si le silence dépasse 3 semaines, propose aussi une version "break-up" digne.`}
+        />
+      )}
+
+      {activeTab === 'pipeline' && <PipelineManager />}
     </div>
   )
 }

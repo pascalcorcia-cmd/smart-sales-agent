@@ -30,6 +30,24 @@ class MeetingUpdate(BaseModel):
     status: str | None = None
 
 
+class Deal(BaseModel):
+    company: str
+    contact_name: str | None = None
+    stage: str = "prospection"
+    value: float | None = None
+    close_date: str | None = None
+    notes: str | None = None
+
+
+class DealUpdate(BaseModel):
+    company: str | None = None
+    contact_name: str | None = None
+    stage: str | None = None
+    value: float | None = None
+    close_date: str | None = None
+    notes: str | None = None
+
+
 class DocxExportRequest(BaseModel):
     title: str
     content: str

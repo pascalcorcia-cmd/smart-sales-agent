@@ -38,6 +38,18 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS deals (
+            id TEXT PRIMARY KEY,
+            company TEXT NOT NULL,
+            contact_name TEXT,
+            stage TEXT NOT NULL DEFAULT 'prospection',
+            value REAL,
+            close_date TEXT,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
 

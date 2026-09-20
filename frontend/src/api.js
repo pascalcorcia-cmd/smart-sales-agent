@@ -79,6 +79,34 @@ export async function deleteMeeting(id) {
   return res.json();
 }
 
+export async function getDeals() {
+  const res = await fetch(`${API_BASE}/deals`);
+  return res.json();
+}
+
+export async function createDeal(deal) {
+  const res = await fetch(`${API_BASE}/deals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(deal),
+  });
+  return res.json();
+}
+
+export async function updateDeal(id, update) {
+  const res = await fetch(`${API_BASE}/deals/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(update),
+  });
+  return res.json();
+}
+
+export async function deleteDeal(id) {
+  const res = await fetch(`${API_BASE}/deals/${id}`, { method: 'DELETE' });
+  return res.json();
+}
+
 async function downloadBlob(res, title, ext) {
   if (!res.ok) throw new Error(`Export ${ext} échoué`);
   const blob = await res.blob();
