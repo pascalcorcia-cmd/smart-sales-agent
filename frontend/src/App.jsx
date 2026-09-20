@@ -89,6 +89,14 @@ export default function App() {
               return updated
             })
             break
+          case 'error':
+            setMessages(prev => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              updated[updated.length - 1] = { ...last, content: `Erreur: ${event.data}`, streaming: false }
+              return updated
+            })
+            break
         }
       })
     } catch (err) {

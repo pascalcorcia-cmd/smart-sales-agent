@@ -59,6 +59,13 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
               return updated
             })
             break
+          case 'error':
+            setMessages(prev => {
+              const updated = [...prev]
+              updated[0] = { ...updated[0], content: `Erreur: ${event.data}`, streaming: false }
+              return updated
+            })
+            break
         }
       })
     } catch (err) {
