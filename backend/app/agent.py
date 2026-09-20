@@ -45,6 +45,12 @@ def _execute_tool(name: str, input_data: dict) -> str:
     return handler(**input_data)
 
 
+def _serialize_content(content: list) -> list[dict]:
+    """Anthropic SDK content blocks (TextBlock, ToolUseBlock) are Pydantic models,
+    not JSON-serializable dicts — convert before storing in messages/SQLite."""
+    return [block.model_dump() for block in content]
+
+
 def run_agent(conversation_id: str | None, user_message: str) -> dict:
     cid, messages = get_or_create_conversation(conversation_id)
     messages.append({"role": "user", "content": user_message})
@@ -61,7 +67,7 @@ def run_agent(conversation_id: str | None, user_message: str) -> dict:
             )
 
             if response.stop_reason == "tool_use":
-                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "assistant", "content": _serialize_content(response.content)})
                 tool_results = []
 
                 for block in response.content:
@@ -80,7 +86,7 @@ def run_agent(conversation_id: str | None, user_message: str) -> dict:
 
                 messages.append({"role": "user", "content": tool_results})
             else:
-                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "assistant", "content": _serialize_content(response.content)})
                 _save_conversation(cid, messages)
 
                 text_response = ""
@@ -137,7 +143,7 @@ def stream_agent(conversation_id: str | None, user_message: str):
                 response = stream.get_final_message()
 
             if response.stop_reason == "tool_use":
-                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "assistant", "content": _serialize_content(response.content)})
                 tool_results = []
 
                 for block in response.content:
@@ -158,7 +164,7 @@ def stream_agent(conversation_id: str | None, user_message: str):
 
                 messages.append({"role": "user", "content": tool_results})
             else:
-                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "assistant", "content": _serialize_content(response.content)})
                 _save_conversation(cid, messages)
                 yield f"data: {json.dumps({'type': 'done', 'data': {'tool_calls': tool_calls_log if tool_calls_log else None}})}\n\n"
                 return
