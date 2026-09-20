@@ -1,5 +1,8 @@
-import React, { useState } from 'react'
-import { streamMessage, createTextBatcher, exportDocx, createMeeting, updateMeeting } from '../api'
+import React, { useState, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import { exportDocx, createMeeting, updateMeeting, runStreamTurn } from '../api'
+
+const LIGHT_MODEL = 'claude-haiku-4-5-20251001'
 
 const STEPS = [
   { n: 1, label: 'Contexte' },
@@ -37,36 +40,27 @@ export default function ReunionWizard({ onClose }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const generateStep = async (prompt) => {
+  // Each step's own state (agenda, briefs, ...) holds its finished result;
+  // streamingContent is only the live buffer for whichever step is currently
+  // generating. Without this, navigating to a step that hasn't run yet would
+  // display the previous step's leftover text (agenda||streamingContent falls
+  // back to whatever was last streamed, even from a different step).
+  useEffect(() => { setStreamingContent('') }, [step])
+
+  const generateStep = async (prompt, { model } = {}) => {
     setLoading(true)
     setError(null)
     setStreamingContent('')
-    let finalContent = ''
-    const batcher = createTextBatcher((content) => {
-      finalContent = content
-      setStreamingContent(content)
+    // Pure text transforms from data already provided in the prompt -- none
+    // of the 7 wizard steps need web search/file/code tools, so skip them
+    // entirely rather than risk the model taking an unnecessary detour.
+    const result = await runStreamTurn(prompt, null, {
+      model,
+      useTools: false,
+      onUpdate: (state) => setStreamingContent(state.content),
     })
-    try {
-      await streamMessage(prompt, null, (event) => {
-        switch (event.type) {
-          case 'text':
-            batcher.append(event.data)
-            break
-          case 'done':
-            batcher.flushNow()
-            break
-          case 'error':
-            finalContent = `Erreur: ${event.data}`
-            setStreamingContent(finalContent)
-            break
-        }
-      })
-    } catch (err) {
-      finalContent = `Erreur: ${err.message}`
-      setStreamingContent(finalContent)
-    }
     setLoading(false)
-    return finalContent
+    return result.content
   }
 
   const addParticipant = (e) => {
@@ -109,7 +103,7 @@ export default function ReunionWizard({ onClose }) {
 
   const handleGenerateEmail = async () => {
     const prompt = `Compte-rendu: ${minutes}\nPlan d'action: ${actionPlan}\n\nRédige un email de synthèse (150 mots max):\n- Objet: (Réunion du JJ/MM – Décisions et actions)\n- 1 phrase de remerciement\n- 3-5 décisions principales\n- Actions prioritaires (responsable/échéance)\n- Date suivi\n- "CR complet en pièce jointe"\n\nDoit tenir sur écran téléphone.`
-    setEmail(await generateStep(prompt))
+    setEmail(await generateStep(prompt, { model: LIGHT_MODEL }))
   }
 
   const handleGenerateTracking = async () => {
@@ -161,20 +155,20 @@ export default function ReunionWizard({ onClose }) {
             📄 Exporter en Word
           </button>
         </div>
-        <div style={styles.resultContent}>{content}</div>
+        <div style={styles.resultContent} className="markdown-content"><ReactMarkdown>{content}</ReactMarkdown></div>
       </div>
     )
   }
 
   const Nav = ({ canNext }) => (
     <div style={styles.nav}>
-      {step > 1 && <button onClick={() => setStep(step - 1)} style={styles.navBtn}>← Précédent</button>}
+      {step > 1 && <button onClick={() => setStep(step - 1)} disabled={loading} style={styles.navBtn}>← Précédent</button>}
       <div style={{ flex: 1 }} />
       <button onClick={handleSave} disabled={saving} style={styles.saveBtn}>
         {saving ? 'Sauvegarde...' : '💾 Enregistrer'}
       </button>
       {step < 7 && (
-        <button onClick={() => setStep(step + 1)} disabled={!canNext} style={styles.navBtn}>
+        <button onClick={() => setStep(step + 1)} disabled={!canNext || loading} style={styles.navBtn}>
           Suivant →
         </button>
       )}
@@ -193,6 +187,7 @@ export default function ReunionWizard({ onClose }) {
           <button
             key={s.n}
             onClick={() => setStep(s.n)}
+            disabled={loading}
             style={{ ...styles.stepDot, ...(step === s.n ? styles.stepDotActive : {}) }}
           >
             {s.n}. {s.label}
@@ -315,7 +310,7 @@ export default function ReunionWizard({ onClose }) {
           </button>
           <ResultBlock content={tracking || streamingContent} stepName="suivi" />
           <div style={styles.nav}>
-            <button onClick={() => setStep(6)} style={styles.navBtn}>← Précédent</button>
+            <button onClick={() => setStep(6)} disabled={loading} style={styles.navBtn}>← Précédent</button>
             <div style={{ flex: 1 }} />
             <button onClick={handleSave} disabled={saving} style={styles.saveBtn}>
               {saving ? 'Sauvegarde...' : '💾 Enregistrer'}
@@ -351,7 +346,7 @@ const styles = {
   resultHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   resultTitle: { fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0, textTransform: 'uppercase', letterSpacing: 0.5 },
   exportBtn: { background: '#334155', border: 'none', borderRadius: 6, padding: '5px 10px', color: '#e2e8f0', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' },
-  resultContent: { fontSize: 13, color: '#cbd5e1', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  resultContent: { fontSize: 13, color: '#cbd5e1', lineHeight: 1.6, wordBreak: 'break-word' },
   nav: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 },
   navBtn: { background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: '10px 16px', color: '#e2e8f0', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' },
   saveBtn: { background: '#22c55e', border: 'none', borderRadius: 8, padding: '10px 16px', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' },

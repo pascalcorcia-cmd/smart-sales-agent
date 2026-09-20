@@ -23,6 +23,7 @@ export default function MeetingManager() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', company: '', contact_name: '', meeting_date: '', notes: '' })
+  const [exportingId, setExportingId] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -52,6 +53,16 @@ export default function MeetingManager() {
   const handleDelete = async (id) => {
     await deleteMeeting(id)
     setMeetings(prev => prev.filter(m => m.id !== id))
+  }
+
+  const handleQuickExport = async (m) => {
+    setExportingId(m.id)
+    try {
+      await exportDocx(`Réunion ${m.title} - compte-rendu`, m.minutes)
+    } catch (err) {
+      alert('Erreur export Word: ' + err.message)
+    }
+    setExportingId(null)
   }
 
   if (mode === 'wizard') {
@@ -140,10 +151,11 @@ export default function MeetingManager() {
               {m.notes && <p style={styles.cardNotes}>{m.notes}</p>}
               {m.minutes && (
                 <button
-                  onClick={() => exportDocx(`Réunion ${m.title} - compte-rendu`, m.minutes)}
+                  onClick={() => handleQuickExport(m)}
+                  disabled={exportingId === m.id}
                   style={styles.cardExportBtn}
                 >
-                  📄 Exporter le CR en Word
+                  {exportingId === m.id ? 'Export...' : '📄 Exporter le CR en Word'}
                 </button>
               )}
             </div>

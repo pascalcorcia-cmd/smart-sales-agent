@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 
-export default function MessageBubble({ message }) {
+function MessageBubble({ message }) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 
@@ -33,3 +33,8 @@ export default function MessageBubble({ message }) {
     </div>
   )
 }
+
+// Sibling messages keep the same object reference when only the last one in
+// the list updates during streaming -- memo skips re-rendering (and re-
+// parsing their markdown) for every message except the one that changed.
+export default React.memo(MessageBubble)

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { streamMessage, uploadFile, exportPptx, createTextBatcher } from '../api'
+import { uploadFile, exportPptx, runStreamTurn } from '../api'
 import MessageBubble from './MessageBubble'
 import ToolOutput from './ToolOutput'
 
@@ -108,82 +108,25 @@ export default function AccountPlan() {
       }])
 
       const prompt = buildPrompt(mod.id)
-      let assistantContent = ''
-      let toolCalls = []
 
       setMessages(prev => [...prev, { role: 'assistant', content: '', toolCalls: [], streaming: true }])
 
-      const textBatcher = createTextBatcher((content) => {
-        assistantContent = content
-        setMessages(prev => {
+      // Each module gets its own fresh conversation (no conversation_id reuse):
+      // buildPrompt() already carries forward a truncated summary of prior
+      // modules via previousResults, so chaining the full conversation on top
+      // of that was paying for the same context twice and made later modules
+      // resend every earlier module's full prompt+response as history (O(n^2)
+      // tokens across a 13-module run).
+      const result = await runStreamTurn(prompt, null, {
+        model: mod.model,
+        onUpdate: (state) => setMessages(prev => {
           const updated = [...prev]
-          const last = updated[updated.length - 1]
-          updated[updated.length - 1] = { ...last, content }
+          updated[updated.length - 1] = { ...updated[updated.length - 1], ...state }
           return updated
-        })
+        }),
       })
 
-      try {
-        // Each module gets its own fresh conversation (no conversation_id reuse):
-        // buildPrompt() already carries forward a truncated summary of prior
-        // modules via previousResults, so chaining the full conversation on top
-        // of that was paying for the same context twice and made later modules
-        // resend every earlier module's full prompt+response as history (O(n^2)
-        // tokens across a 13-module run).
-        await streamMessage(prompt, null, (event) => {
-          switch (event.type) {
-            case 'text':
-              textBatcher.append(event.data)
-              break
-            case 'tool_start':
-              toolCalls.push({ tool: event.data.tool, status: 'running' })
-              setMessages(prev => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                updated[updated.length - 1] = { ...last, toolCalls: [...toolCalls] }
-                return updated
-              })
-              break
-            case 'tool_result':
-              toolCalls = toolCalls.map(tc =>
-                tc.tool === event.data.tool && tc.status === 'running'
-                  ? { ...tc, status: 'done', result: event.data.result }
-                  : tc
-              )
-              setMessages(prev => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                updated[updated.length - 1] = { ...last, toolCalls: [...toolCalls] }
-                return updated
-              })
-              break
-            case 'done':
-              textBatcher.flushNow()
-              setMessages(prev => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                updated[updated.length - 1] = { ...last, streaming: false }
-                return updated
-              })
-              break
-            case 'error':
-              setMessages(prev => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                updated[updated.length - 1] = { ...last, content: `Erreur: ${event.data}`, streaming: false }
-                return updated
-              })
-              break
-          }
-        }, mod.model)
-
-        setResults(prev => ({ ...prev, [mod.id]: assistantContent }))
-      } catch (err) {
-        setMessages(prev => [...prev, {
-          role: 'system',
-          content: `Erreur sur ${mod.label}: ${err.message}`
-        }])
-      }
+      setResults(prev => ({ ...prev, [mod.id]: result.content }))
     }
 
     setProgress(100)

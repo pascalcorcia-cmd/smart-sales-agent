@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { streamMessage, uploadFile, createTextBatcher } from './api'
+import { uploadFile, runStreamTurn } from './api'
 import MessageBubble from './components/MessageBubble'
 import ToolOutput from './components/ToolOutput'
 import FileUpload from './components/FileUpload'
@@ -42,80 +42,16 @@ export default function App() {
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
 
-    let toolCalls = []
-
     setMessages(prev => [...prev, { role: 'assistant', content: '', toolCalls: [], streaming: true }])
 
-    const textBatcher = createTextBatcher((content) => {
-      setMessages(prev => {
+    const result = await runStreamTurn(userMsg, conversationId, {
+      onUpdate: (state) => setMessages(prev => {
         const updated = [...prev]
-        const last = updated[updated.length - 1]
-        updated[updated.length - 1] = { ...last, content }
+        updated[updated.length - 1] = { ...updated[updated.length - 1], ...state }
         return updated
-      })
+      }),
     })
-
-    try {
-      await streamMessage(userMsg, conversationId, (event) => {
-        switch (event.type) {
-          case 'conversation_id':
-            setConversationId(event.data)
-            break
-          case 'text':
-            textBatcher.append(event.data)
-            break
-          case 'tool_start':
-            toolCalls.push({ tool: event.data.tool, status: 'running' })
-            setMessages(prev => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              updated[updated.length - 1] = { ...last, toolCalls: [...toolCalls] }
-              return updated
-            })
-            break
-          case 'tool_result':
-            toolCalls = toolCalls.map(tc =>
-              tc.tool === event.data.tool && tc.status === 'running'
-                ? { ...tc, status: 'done', result: event.data.result }
-                : tc
-            )
-            setMessages(prev => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              updated[updated.length - 1] = { ...last, toolCalls: [...toolCalls] }
-              return updated
-            })
-            break
-          case 'done':
-            textBatcher.flushNow()
-            setMessages(prev => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              updated[updated.length - 1] = { ...last, streaming: false }
-              return updated
-            })
-            break
-          case 'error':
-            setMessages(prev => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              updated[updated.length - 1] = { ...last, content: `Erreur: ${event.data}`, streaming: false }
-              return updated
-            })
-            break
-        }
-      })
-    } catch (err) {
-      setMessages(prev => {
-        const updated = [...prev]
-        updated[updated.length - 1] = {
-          role: 'assistant',
-          content: `Erreur: ${err.message}`,
-          streaming: false
-        }
-        return updated
-      })
-    }
+    if (result.conversationId) setConversationId(result.conversationId)
 
     setLoading(false)
     inputRef.current?.focus()
@@ -297,6 +233,8 @@ export default function App() {
             { key: 'silenceDuration', label: 'Depuis combien de temps sans réponse ?', placeholder: 'Ex: 10 jours', required: false },
           ]}
           buildPrompt={(v) => `Rédige un message de relance pour ${v.companyName}${v.contactName ? `, à destination de ${v.contactName}` : ''}.\nDernier échange : ${v.lastInteraction}${v.silenceDuration ? `\nSilence depuis : ${v.silenceDuration}` : ''}\nÉvite les relances génériques ("je reviens vers vous") : apporte une vraie raison de recontacter (nouvel élément, question précise, ressource utile). Propose 2 variantes : une courte et directe, une plus contextuelle. Si le silence dépasse 3 semaines, propose aussi une version "break-up" digne.`}
+          model="claude-haiku-4-5-20251001"
+          useTools={false}
         />
       )}
 

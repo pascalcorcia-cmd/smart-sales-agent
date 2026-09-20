@@ -5,6 +5,7 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
     model: str | None = None
+    use_tools: bool = True
 
 
 class ChatResponse(BaseModel):

@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { streamMessage, exportDocx, createTextBatcher } from '../api'
+import { exportDocx, runStreamTurn } from '../api'
 import MessageBubble from './MessageBubble'
 import ToolOutput from './ToolOutput'
 
-export default function PromptTool({ title, subtitle, fields, buildPrompt, submitLabel, model }) {
+export default function PromptTool({ title, subtitle, fields, buildPrompt, submitLabel, model, useTools }) {
   const [values, setValues] = useState({})
   const [step, setStep] = useState('form')
   const [messages, setMessages] = useState([])
@@ -19,62 +19,15 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
     setLoading(true)
     setMessages([{ role: 'assistant', content: '', toolCalls: [], streaming: true }])
 
-    let toolCalls = []
-
-    const textBatcher = createTextBatcher((content) => {
-      setMessages(prev => {
+    await runStreamTurn(buildPrompt(values), null, {
+      model,
+      useTools,
+      onUpdate: (state) => setMessages(prev => {
         const updated = [...prev]
-        updated[0] = { ...updated[0], content }
+        updated[0] = { ...updated[0], ...state }
         return updated
-      })
+      }),
     })
-
-    try {
-      await streamMessage(buildPrompt(values), null, (event) => {
-        switch (event.type) {
-          case 'text':
-            textBatcher.append(event.data)
-            break
-          case 'tool_start':
-            toolCalls.push({ tool: event.data.tool, status: 'running' })
-            setMessages(prev => {
-              const updated = [...prev]
-              updated[0] = { ...updated[0], toolCalls: [...toolCalls] }
-              return updated
-            })
-            break
-          case 'tool_result':
-            toolCalls = toolCalls.map(tc =>
-              tc.tool === event.data.tool && tc.status === 'running'
-                ? { ...tc, status: 'done', result: event.data.result }
-                : tc
-            )
-            setMessages(prev => {
-              const updated = [...prev]
-              updated[0] = { ...updated[0], toolCalls: [...toolCalls] }
-              return updated
-            })
-            break
-          case 'done':
-            textBatcher.flushNow()
-            setMessages(prev => {
-              const updated = [...prev]
-              updated[0] = { ...updated[0], streaming: false }
-              return updated
-            })
-            break
-          case 'error':
-            setMessages(prev => {
-              const updated = [...prev]
-              updated[0] = { ...updated[0], content: `Erreur: ${event.data}`, streaming: false }
-              return updated
-            })
-            break
-        }
-      }, model)
-    } catch (err) {
-      setMessages([{ role: 'assistant', content: `Erreur: ${err.message}`, streaming: false }])
-    }
 
     setLoading(false)
   }

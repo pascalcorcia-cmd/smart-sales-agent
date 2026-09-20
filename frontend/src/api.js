@@ -9,11 +9,11 @@ export async function sendMessage(message, conversationId) {
   return res.json();
 }
 
-export async function streamMessage(message, conversationId, onEvent, model) {
+export async function streamMessage(message, conversationId, onEvent, model, useTools = true) {
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, conversation_id: conversationId, model: model || undefined }),
+    body: JSON.stringify({ message, conversation_id: conversationId, model: model || undefined, use_tools: useTools }),
   });
 
   const reader = res.body.getReader();
@@ -56,6 +56,60 @@ export function createTextBatcher(onFlush) {
     },
     flushNow() { flush(); },
   };
+}
+
+// Runs one streamed turn and reports {content, toolCalls, streaming} through
+// a single onUpdate callback. App.jsx, AccountPlan.jsx, PromptTool.jsx and
+// ReunionWizard.jsx each used to hand-roll the same text/tool_start/
+// tool_result/done/error switch statement -- every fix (e.g. the missing
+// 'error' case) had to be applied 3-4 times separately. Callers only decide
+// *where* the {content, toolCalls, streaming} shape gets written.
+export async function runStreamTurn(prompt, conversationId, { model, useTools, onUpdate } = {}) {
+  let content = '';
+  let toolCalls = [];
+  let newConversationId = null;
+  const batcher = createTextBatcher((text) => {
+    content = text;
+    onUpdate({ content, toolCalls, streaming: true });
+  });
+
+  try {
+    await streamMessage(prompt, conversationId, (event) => {
+      switch (event.type) {
+        case 'conversation_id':
+          newConversationId = event.data;
+          break;
+        case 'text':
+          batcher.append(event.data);
+          break;
+        case 'tool_start':
+          toolCalls = [...toolCalls, { tool: event.data.tool, status: 'running' }];
+          onUpdate({ content, toolCalls, streaming: true });
+          break;
+        case 'tool_result':
+          toolCalls = toolCalls.map(tc =>
+            tc.tool === event.data.tool && tc.status === 'running'
+              ? { ...tc, status: 'done', result: event.data.result }
+              : tc
+          );
+          onUpdate({ content, toolCalls, streaming: true });
+          break;
+        case 'done':
+          batcher.flushNow();
+          onUpdate({ content, toolCalls, streaming: false });
+          break;
+        case 'error':
+          content = `Erreur: ${event.data}`;
+          onUpdate({ content, toolCalls, streaming: false });
+          break;
+      }
+    }, model, useTools ?? true);
+  } catch (err) {
+    content = `Erreur: ${err.message}`;
+    onUpdate({ content, toolCalls, streaming: false });
+  }
+
+  return { content, toolCalls, conversationId: newConversationId };
 }
 
 export async function uploadFile(file) {

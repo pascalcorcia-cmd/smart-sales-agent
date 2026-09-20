@@ -62,20 +62,17 @@ def _serialize_content(content: list) -> list[dict]:
 TRUNCATION_NOTICE = "\n\n⚠️ *Réponse tronquée (limite de tokens atteinte) — redemande une version plus concise ou en plusieurs parties si besoin.*"
 
 
-def run_agent(conversation_id: str | None, user_message: str, model: str | None = None) -> dict:
+def run_agent(conversation_id: str | None, user_message: str, model: str | None = None, use_tools: bool = True) -> dict:
     cid, messages = get_or_create_conversation(conversation_id)
     messages.append({"role": "user", "content": user_message})
     tool_calls_log = []
 
     for _ in range(MAX_ITERATIONS):
         try:
-            response = client.messages.create(
-                model=model or CLAUDE_MODEL,
-                max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT_CACHED,
-                tools=ALL_TOOLS,
-                messages=messages,
-            )
+            kwargs = dict(model=model or CLAUDE_MODEL, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT_CACHED, messages=messages)
+            if use_tools:
+                kwargs["tools"] = ALL_TOOLS
+            response = client.messages.create(**kwargs)
 
             if response.stop_reason == "tool_use":
                 messages.append({"role": "assistant", "content": _serialize_content(response.content)})
@@ -129,7 +126,7 @@ def run_agent(conversation_id: str | None, user_message: str, model: str | None 
     }
 
 
-def stream_agent(conversation_id: str | None, user_message: str, model: str | None = None):
+def stream_agent(conversation_id: str | None, user_message: str, model: str | None = None, use_tools: bool = True):
     """Generator that yields SSE events for streaming responses."""
     cid, messages = get_or_create_conversation(conversation_id)
     messages.append({"role": "user", "content": user_message})
@@ -139,13 +136,10 @@ def stream_agent(conversation_id: str | None, user_message: str, model: str | No
 
     for _ in range(MAX_ITERATIONS):
         try:
-            with client.messages.stream(
-                model=model or CLAUDE_MODEL,
-                max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT_CACHED,
-                tools=ALL_TOOLS,
-                messages=messages,
-            ) as stream:
+            kwargs = dict(model=model or CLAUDE_MODEL, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT_CACHED, messages=messages)
+            if use_tools:
+                kwargs["tools"] = ALL_TOOLS
+            with client.messages.stream(**kwargs) as stream:
                 for event in stream:
                     if event.type == "content_block_start":
                         if event.content_block.type == "tool_use":
