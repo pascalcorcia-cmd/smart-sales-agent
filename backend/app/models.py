@@ -20,6 +20,12 @@ class Meeting(BaseModel):
     meeting_date: str | None = None
     notes: str | None = None
     status: str = "planifie"
+    agenda: str | None = None
+    briefs: str | None = None
+    facilitation_guide: str | None = None
+    minutes: str | None = None
+    action_plan: str | None = None
+    follow_up_email: str | None = None
 
 
 class MeetingUpdate(BaseModel):
@@ -29,6 +35,12 @@ class MeetingUpdate(BaseModel):
     meeting_date: str | None = None
     notes: str | None = None
     status: str | None = None
+    agenda: str | None = None
+    briefs: str | None = None
+    facilitation_guide: str | None = None
+    minutes: str | None = None
+    action_plan: str | None = None
+    follow_up_email: str | None = None
 
 
 class Deal(BaseModel):

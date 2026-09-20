@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { getMeetings, createMeeting, updateMeeting, deleteMeeting } from '../api'
+import { getMeetings, createMeeting, updateMeeting, deleteMeeting, exportDocx } from '../api'
+import ReunionWizard from './ReunionWizard'
 
 const STATUSES = {
   planifie: { label: 'Planifié', color: '#6366f1' },
@@ -17,6 +18,7 @@ const sortMeetings = (list) => [...list].sort((a, b) => {
 })
 
 export default function MeetingManager() {
+  const [mode, setMode] = useState('list')
   const [meetings, setMeetings] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -52,13 +54,22 @@ export default function MeetingManager() {
     setMeetings(prev => prev.filter(m => m.id !== id))
   }
 
+  if (mode === 'wizard') {
+    return <ReunionWizard onClose={() => { setMode('list'); load() }} />
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>Gestion des Réunions</h2>
-        <button onClick={() => setShowForm(!showForm)} style={styles.addBtn}>
-          {showForm ? 'Annuler' : '+ Nouvelle réunion'}
-        </button>
+        <div style={styles.headerActions}>
+          <button onClick={() => setMode('wizard')} style={styles.wizardBtn}>
+            🧭 Assistant Réunion Stratégique
+          </button>
+          <button onClick={() => setShowForm(!showForm)} style={styles.addBtn}>
+            {showForm ? 'Annuler' : '+ Nouvelle réunion'}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -127,6 +138,14 @@ export default function MeetingManager() {
                 {m.meeting_date && <span>📅 {m.meeting_date}</span>}
               </div>
               {m.notes && <p style={styles.cardNotes}>{m.notes}</p>}
+              {m.minutes && (
+                <button
+                  onClick={() => exportDocx(`Réunion ${m.title} - compte-rendu`, m.minutes)}
+                  style={styles.cardExportBtn}
+                >
+                  📄 Exporter le CR en Word
+                </button>
+              )}
             </div>
             <button onClick={() => handleDelete(m.id)} style={styles.deleteBtn} title="Supprimer">
               ✕
@@ -154,6 +173,18 @@ const styles = {
     marginBottom: 20,
   },
   title: { fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 },
+  headerActions: { display: 'flex', gap: 8 },
+  wizardBtn: {
+    background: '#1e293b',
+    color: '#e2e8f0',
+    border: '1px solid #6366f1',
+    borderRadius: 8,
+    padding: '8px 16px',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: 'inherit',
+  },
   addBtn: {
     background: '#6366f1',
     color: '#fff',
@@ -235,6 +266,17 @@ const styles = {
   },
   cardMeta: { display: 'flex', gap: 12, fontSize: 12, color: '#94a3b8', flexWrap: 'wrap' },
   cardNotes: { fontSize: 13, color: '#cbd5e1', marginTop: 6, marginBottom: 0 },
+  cardExportBtn: {
+    background: '#334155',
+    border: 'none',
+    borderRadius: 6,
+    padding: '5px 10px',
+    color: '#e2e8f0',
+    cursor: 'pointer',
+    fontSize: 12,
+    fontFamily: 'inherit',
+    marginTop: 8,
+  },
   deleteBtn: {
     background: 'none',
     border: 'none',

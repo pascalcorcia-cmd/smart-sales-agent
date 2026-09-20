@@ -38,6 +38,14 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Réunion Stratégique wizard output, added to the existing meetings table
+    # rather than a separate one -- one row per meeting stays the single
+    # source of truth whether it was created from the quick form or the wizard.
+    for column in ("agenda", "briefs", "facilitation_guide", "minutes", "action_plan", "follow_up_email"):
+        try:
+            conn.execute(f"ALTER TABLE meetings ADD COLUMN {column} TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists from a previous startup
     conn.execute("""
         CREATE TABLE IF NOT EXISTS deals (
             id TEXT PRIMARY KEY,

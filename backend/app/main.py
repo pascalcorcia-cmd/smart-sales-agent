@@ -100,19 +100,22 @@ def export_pptx(request: PptxExportRequest):
     )
 
 
+MEETING_COLUMNS = [
+    "id", "title", "company", "contact_name", "meeting_date", "notes", "status",
+    "agenda", "briefs", "facilitation_guide", "minutes", "action_plan", "follow_up_email",
+    "created_at",
+]
+
+
 def _meeting_row_to_dict(row):
-    return {
-        "id": row[0], "title": row[1], "company": row[2], "contact_name": row[3],
-        "meeting_date": row[4], "notes": row[5], "status": row[6], "created_at": row[7],
-    }
+    return dict(zip(MEETING_COLUMNS, row))
 
 
 @app.get("/api/meetings")
 def list_meetings():
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(
-        "SELECT id, title, company, contact_name, meeting_date, notes, status, created_at "
-        "FROM meetings ORDER BY meeting_date IS NULL, meeting_date ASC"
+        f"SELECT {', '.join(MEETING_COLUMNS)} FROM meetings ORDER BY meeting_date IS NULL, meeting_date ASC"
     ).fetchall()
     conn.close()
     return {"meetings": [_meeting_row_to_dict(r) for r in rows]}
@@ -121,15 +124,21 @@ def list_meetings():
 @app.post("/api/meetings")
 def create_meeting(meeting: Meeting):
     mid = str(uuid.uuid4())
+    data = meeting.model_dump()
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "INSERT INTO meetings (id, title, company, contact_name, meeting_date, notes, status) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (mid, meeting.title, meeting.company, meeting.contact_name, meeting.meeting_date, meeting.notes, meeting.status),
+        "INSERT INTO meetings (id, title, company, contact_name, meeting_date, notes, status, "
+        "agenda, briefs, facilitation_guide, minutes, action_plan, follow_up_email) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            mid, data["title"], data["company"], data["contact_name"], data["meeting_date"],
+            data["notes"], data["status"], data["agenda"], data["briefs"],
+            data["facilitation_guide"], data["minutes"], data["action_plan"], data["follow_up_email"],
+        ),
     )
     conn.commit()
     conn.close()
-    return {"id": mid, **meeting.model_dump()}
+    return {"id": mid, **data}
 
 
 @app.put("/api/meetings/{meeting_id}")
