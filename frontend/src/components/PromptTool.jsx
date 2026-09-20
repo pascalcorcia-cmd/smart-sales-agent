@@ -130,7 +130,7 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
       <div style={styles.messagesArea}>
         {messages.map((msg, i) => (
           <div key={i}>
-            {msg.toolCalls?.map((tc, j) => (
+            {msg.toolCalls?.filter(tc => tc.tool === 'write_file').map((tc, j) => (
               <ToolOutput key={j} toolCall={tc} />
             ))}
             {msg.content && <MessageBubble message={msg} />}

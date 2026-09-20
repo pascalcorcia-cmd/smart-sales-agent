@@ -328,7 +328,7 @@ export default function AccountPlan() {
       <div style={styles.messagesArea}>
         {messages.map((msg, i) => (
           <div key={i}>
-            {msg.toolCalls?.map((tc, j) => (
+            {msg.toolCalls?.filter(tc => tc.tool === 'write_file').map((tc, j) => (
               <ToolOutput key={j} toolCall={tc} />
             ))}
             {msg.content && <MessageBubble message={msg} />}
