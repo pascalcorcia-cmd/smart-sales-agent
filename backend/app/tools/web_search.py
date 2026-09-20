@@ -25,7 +25,10 @@ WEB_SEARCH_TOOL = {
 def web_search(query: str, max_results: int = 5) -> str:
     try:
         with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=max_results))
+            # ponytail: backend="auto" fans out to 8 search engines per call (many
+            # 429 from cloud IPs), turning one search into 10-20s. Pin to the one
+            # engine that responds reliably; widen if duckduckgo itself starts failing.
+            results = list(ddgs.text(query, max_results=max_results, backend="duckduckgo"))
         if not results:
             return json.dumps({"status": "no_results", "message": "Aucun résultat trouvé"})
         formatted = []
