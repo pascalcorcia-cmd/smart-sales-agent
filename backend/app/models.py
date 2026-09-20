@@ -28,3 +28,8 @@ class MeetingUpdate(BaseModel):
     meeting_date: str | None = None
     notes: str | None = None
     status: str | None = None
+
+
+class DocxExportRequest(BaseModel):
+    title: str
+    content: str

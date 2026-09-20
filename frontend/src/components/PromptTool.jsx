@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { streamMessage } from '../api'
+import { streamMessage, exportDocx } from '../api'
 import MessageBubble from './MessageBubble'
 import ToolOutput from './ToolOutput'
 
@@ -8,6 +8,7 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
   const [step, setStep] = useState('form')
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const setField = (key, val) => setValues(prev => ({ ...prev, [key]: val }))
 
@@ -117,15 +118,32 @@ export default function PromptTool({ title, subtitle, fields, buildPrompt, submi
     )
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await exportDocx(title, messages[0]?.content || '')
+    } catch (err) {
+      alert('Erreur export Word: ' + err.message)
+    }
+    setExporting(false)
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.runningHeader}>
         <h2 style={styles.runningTitle}>{title}</h2>
-        {!loading && (
-          <button onClick={() => { setStep('form'); setMessages([]) }} style={styles.backBtn}>
-            Nouvelle demande
-          </button>
-        )}
+        <div style={styles.runningActions}>
+          {!loading && messages[0]?.content && (
+            <button onClick={handleExport} disabled={exporting} style={styles.exportBtn}>
+              {exporting ? 'Export...' : '📄 Exporter en Word'}
+            </button>
+          )}
+          {!loading && (
+            <button onClick={() => { setStep('form'); setMessages([]) }} style={styles.backBtn}>
+              Nouvelle demande
+            </button>
+          )}
+        </div>
       </div>
       <div style={styles.messagesArea}>
         {messages.map((msg, i) => (
@@ -215,6 +233,18 @@ const styles = {
     borderBottom: '1px solid #1e293b',
   },
   runningTitle: { fontSize: 18, fontWeight: 700, color: '#f1f5f9', margin: 0 },
+  runningActions: { display: 'flex', gap: 8 },
+  exportBtn: {
+    background: '#6366f1',
+    border: 'none',
+    borderRadius: 8,
+    padding: '8px 16px',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: 'inherit',
+  },
   backBtn: {
     background: '#1e293b',
     border: '1px solid #334155',

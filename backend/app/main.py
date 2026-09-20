@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import sqlite3
 import uuid
@@ -10,8 +11,9 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import UPLOAD_DIR, CORS_ORIGINS, ENVIRONMENT, DB_PATH
-from app.models import ChatRequest, Meeting, MeetingUpdate
+from app.models import ChatRequest, Meeting, MeetingUpdate, DocxExportRequest
 from app.agent import run_agent, stream_agent
+from app.docx_export import markdown_to_docx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -73,6 +75,17 @@ def download_file(filename: str):
     if not os.path.isfile(filepath):
         raise HTTPException(status_code=404, detail="Fichier introuvable")
     return FileResponse(filepath, filename=os.path.basename(filename))
+
+
+@app.post("/api/export/docx")
+def export_docx(request: DocxExportRequest):
+    buffer = markdown_to_docx(request.title, request.content)
+    safe_name = re.sub(r"[^\w\-]+", "_", request.title).strip("_") or "document"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.docx"'},
+    )
 
 
 def _meeting_row_to_dict(row):

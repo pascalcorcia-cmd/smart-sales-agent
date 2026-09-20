@@ -78,3 +78,19 @@ export async function deleteMeeting(id) {
   const res = await fetch(`${API_BASE}/meetings/${id}`, { method: 'DELETE' });
   return res.json();
 }
+
+export async function exportDocx(title, content) {
+  const res = await fetch(`${API_BASE}/export/docx`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, content }),
+  });
+  if (!res.ok) throw new Error('Export Word échoué');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${title.replace(/[^\w\-]+/g, '_')}.docx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
