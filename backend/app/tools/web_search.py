@@ -1,5 +1,5 @@
 import json
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 WEB_SEARCH_TOOL = {
     "name": "web_search",
